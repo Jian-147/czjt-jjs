@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: mail-test
+  mail:
+    host: smtp.163.com
+    port: 465
+    username: 18032215640@163.com
+    password: WVqSZmQMgJdH2bjd
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          ssl:
+            enable: true
