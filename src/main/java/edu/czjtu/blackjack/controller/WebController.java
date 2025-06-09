@@ -1,7 +1,6 @@
 package edu.czjtu.blackjack.controller;
 
 import edu.czjtu.blackjack.common.Result;
-import edu.czjtu.blackjack.exception.CustomException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
