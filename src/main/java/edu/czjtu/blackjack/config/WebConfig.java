@@ -18,7 +18,7 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**") // 对所有接口生效
-                .allowedOrigins("http://127.0.0.1:5500") // 允许来自 http://127.0.0.1:5500 的请求
+                .allowedOrigins("http://localhost:5173", "http://127.0.0.1:5173") // 允许来自 http://127.0.0.1:5173 的请求
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS") // 允许的请求方法
                 .allowedHeaders("*") // 允许的请求头
                 .allowCredentials(true) // 是否允许发送Cookie
@@ -29,6 +29,6 @@ public class WebConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(loginInterceptor())
                 .addPathPatterns("/**") // 拦截所有请求
-                .excludePathPatterns("/user/login", "/user/register","/user/logout", "/upload/**", "/category/**"); // 放行登录接口和注册接口
+                .excludePathPatterns("/hello","/user/login", "/user/register","/user/logout", "/upload/**", "/category/**"); // 放行登录接口和注册接口
     }
 }
