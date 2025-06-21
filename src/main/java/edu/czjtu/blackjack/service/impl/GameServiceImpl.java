@@ -184,12 +184,6 @@ public class GameServiceImpl implements GameService {
         int a = calculateScore(Arrays.asList(newCard));//计算新牌的数值
         game.setPlayerScore(game.getPlayerScore() + a);//把新计算的数值放进数据库
 
-        // 数据埋点：更新玩家数据（21点数据记录）
-        if(game.getPlayerScore()==21){
-            Player player = playerMapper.selectById(game.getPlayerId());
-            player.setWin21(player.getWin21()+1);
-        }
-
         // 检查是否爆牌
         if (isBust(game.getPlayerScore())) {
             game.setGameStatus("庄家赢");
@@ -252,6 +246,7 @@ public class GameServiceImpl implements GameService {
                 game.setResult("庄家爆牌！玩家获胜！");
                 Player player = playerMapper.selectById(game.getPlayerId());
                 player.setWinNumber(player.getWinNumber()+1);
+                playerMapper.updateById(player);
                 win(game.getPlayerId(), game.getPlayerScore());
                 game.setBetAmount(game.getBetAmount()*2);//筹码翻倍
                 return game;
@@ -261,6 +256,7 @@ public class GameServiceImpl implements GameService {
         if(game.getPlayerScore()==21){
             Player player = playerMapper.selectById(game.getPlayerId());
             player.setWin21(player.getWin21()+1);
+            playerMapper.updateById(player);
         }
 
         // 比较点数决定胜负
@@ -346,6 +342,7 @@ public class GameServiceImpl implements GameService {
         if(b==21){
             player.setDanNumber(player.getDanNumber()+5);
         }
+        playerMapper.updateById(player);
         dan(a); // 更新段位
     }
     //计算排位积分失败减1
@@ -354,6 +351,7 @@ public class GameServiceImpl implements GameService {
         if(player.getDanNumber()>0){
             player.setDanNumber(player.getDanNumber()-1);
         }
+        playerMapper.updateById(player);
         dan(a); // 更新段位
     }
     //检查排位数据进行升级降级
