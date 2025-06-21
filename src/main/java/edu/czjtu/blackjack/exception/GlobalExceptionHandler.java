@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 //全局异常类
-@ControllerAdvice("com.example.controller")
+@ControllerAdvice("edu.czjtu.blackjack.controller")
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(CustomException.class)

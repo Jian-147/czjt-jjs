@@ -3,10 +3,13 @@ package edu.czjtu.blackjack.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import edu.czjtu.blackjack.common.IdGenerator;
+import edu.czjtu.blackjack.entity.Player;
 import edu.czjtu.blackjack.entity.User;
 import edu.czjtu.blackjack.exception.CustomException;
 import edu.czjtu.blackjack.mapper.UserMapper;
+import edu.czjtu.blackjack.mapper.PlayerMapper;
 import edu.czjtu.blackjack.service.UserService;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
@@ -15,6 +18,9 @@ import java.time.LocalDateTime;
 
 @Service
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
+
+    @Resource
+    private PlayerMapper playerMapper;
 
     @Override
     public User register(String username, String password) {
@@ -39,7 +45,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             userId = IdGenerator.generateUserId();
         } while (isIdExists(userId));
 
-        // 4. 创建用户对象
+        // 4. 创建用户对象并保存到用户表
         User user = new User();
         user.setId(userId);
         user.setUsername(username);
@@ -48,13 +54,30 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         user.setEmail(""); // 默认为空
         user.setPhone(""); // 默认为空
         user.setUserPic("/userpic"); // 默认头像
-        user.setBalance(0); // 初始余额为0
+        user.setBalance(2000); // 初始余额为0
         user.setState("离线"); // 初始状态为离线
         user.setCreateTime(LocalDateTime.now());
         user.setUpdateTime(LocalDateTime.now());
-
-        // 5. 保存用户
         save(user);
+
+        // 5. 同时创建对应的Player记录并保存到玩家表
+        Player player = new Player();
+        player.setPlayerId(userId); // 使用User的ID作为Player的ID
+        player.setBalance(2000.0); // 初始游戏余额，可根据需求调整
+        player.setInitialBalance(2000.0); // 初始游戏余额
+        player.setConsecutiveLosses(0);
+        player.setConsecutiveWins(0);
+        player.setTotalLoss(0.0);
+        player.setWinNumber(0);
+        player.setAllNumber(0);
+        player.setWinning(0);
+        player.setWin21(0);
+        player.setAllTime(0);
+        player.setDan("新手III"); // 默认段位
+        player.setDanNumber(0); // 默认段位积分
+        player.setDanSort("未上榜"); // 默认段位排名
+        playerMapper.insert(player);
+
         return user;
     }
 

@@ -1,6 +1,7 @@
 package edu.czjtu.blackjack.interceptors;
 
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.czjtu.blackjack.common.JWTUtil;
 import edu.czjtu.blackjack.common.Result;
 import jakarta.servlet.http.HttpServletRequest;
@@ -11,15 +12,22 @@ import java.util.Map;
 
 public class LoginInterceptor implements HandlerInterceptor {
 
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        // 如果是 OPTIONS 请求，直接放行
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
+
         // 从请求头中获取 Token
         String token = request.getHeader("Authorization");
 
         if (token == null) {
             // Token 为空，返回未登录错误信息
             response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write(Result.error("用户未登录。").toString());
+            response.getWriter().write(objectMapper.writeValueAsString(Result.error("用户未登录。")));
             return false;
         }
 
@@ -33,7 +41,7 @@ public class LoginInterceptor implements HandlerInterceptor {
         } catch (Exception e) {
             // Token 验证失败，返回错误信息
             response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write(Result.error(e.getMessage()).toString());
+            response.getWriter().write(objectMapper.writeValueAsString(Result.error(e.getMessage())));
             return false;
         }
     }

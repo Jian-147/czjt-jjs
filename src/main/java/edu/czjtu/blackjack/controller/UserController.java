@@ -90,4 +90,100 @@ public class UserController {
         boolean success = userService.removeById(id);
         return success ? Result.success("删除成功") : Result.error("删除失败");
     }
+
+    @PostMapping("/update")
+    public Result updateUser(@RequestBody User user) {
+        try {
+            // 根据用户ID查询用户是否存在
+            User existingUser = userService.getById(user.getId());
+            if (existingUser == null) {
+                return Result.error("用户不存在");
+            }
+            // 更新用户信息
+            if (user.getUsername() != null) {
+                existingUser.setUsername(user.getUsername());
+            }
+            if (user.getPassword() != null) {
+                // 密码加密存储
+                existingUser.setPassword(org.springframework.util.DigestUtils.md5DigestAsHex(user.getPassword().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            }
+            if (user.getEmail() != null) {
+                existingUser.setEmail(user.getEmail());
+            }
+            if (user.getPhone() != null) {
+                existingUser.setPhone(user.getPhone());
+            }
+            if (user.getUserPic() != null) {
+                existingUser.setUserPic(user.getUserPic());
+            }
+            if (user.getBalance() != null) {
+                existingUser.setBalance(user.getBalance());
+            }
+            if (user.getState() != null) {
+                existingUser.setState(user.getState());
+            }
+            existingUser.setUpdateTime(java.time.LocalDateTime.now());
+
+            // 保存更新后的用户信息
+            boolean success = userService.updateById(existingUser);
+            if (success) {
+                return Result.success("用户信息更新成功");
+            } else {
+                return Result.error("用户信息更新失败");
+            }
+        } catch (Exception e) {
+            return Result.error("更新用户信息时发生错误：" + e.getMessage());
+        }
+    }
+    @PostMapping("/updateBalance")
+    public Result updateBalance(@RequestBody Map<String, Object> params) {
+        try {
+            // 获取用户ID
+            Object idObj = params.get("id");
+            if (idObj == null) {
+                return Result.error("用户ID不能为空");
+            }
+            int id;
+            try {
+                id = Integer.parseInt(idObj.toString());
+            } catch (NumberFormatException e) {
+                return Result.error("用户ID格式不正确");
+            }
+
+            // 获取要修改的余额
+            Object balanceObj = params.get("balance");
+            if (balanceObj == null) {
+                return Result.error("余额不能为空");
+            }
+            int balance;
+            try {
+                balance = Integer.parseInt(balanceObj.toString());
+                if (balance < 0) {
+                    return Result.error("余额不能为负数");
+                }
+            } catch (NumberFormatException e) {
+                return Result.error("余额格式不正确");
+            }
+
+            // 查询用户是否存在
+            User existingUser = userService.getById(id);
+            if (existingUser == null) {
+                return Result.error("用户不存在");
+            }
+
+            // 更新余额
+            existingUser.setBalance(balance);
+            existingUser.setUpdateTime(java.time.LocalDateTime.now());
+
+            // 保存更新
+            boolean success = userService.updateById(existingUser);
+            if (success) {
+                return Result.success("余额更新成功");
+            } else {
+                return Result.error("余额更新失败");
+            }
+        } catch (Exception e) {
+            return Result.error("更新余额时发生错误：" + e.getMessage());
+        }
+    }
 }
