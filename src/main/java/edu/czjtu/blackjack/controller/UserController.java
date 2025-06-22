@@ -186,4 +186,17 @@ public class UserController {
             return Result.error("更新余额时发生错误：" + e.getMessage());
         }
     }
+
+    @GetMapping("/getUserById/{id}")
+    public Result getUserById(@PathVariable Integer id) {
+        try {
+            User user = userService.getById(id);
+            if (user != null) {
+                return Result.success(user);
+            }
+            return Result.error("404", "用户不存在");
+        } catch (Exception e) {
+            return Result.error("500", "获取用户信息失败: " + e.getMessage());
+        }
+    }
 }
