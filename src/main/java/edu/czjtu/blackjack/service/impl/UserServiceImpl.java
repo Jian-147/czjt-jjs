@@ -9,7 +9,10 @@ import edu.czjtu.blackjack.exception.CustomException;
 import edu.czjtu.blackjack.mapper.UserMapper;
 import edu.czjtu.blackjack.mapper.PlayerMapper;
 import edu.czjtu.blackjack.service.UserService;
+import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
@@ -21,6 +24,29 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     @Resource
     private PlayerMapper playerMapper;
+
+    @Resource
+    private MeterRegistry meterRegistry;
+
+    private Counter successfulLoginsCounter;
+    private Counter newRegistrationsCounter;
+
+    @PostConstruct
+    public void init() {
+        successfulLoginsCounter = Counter.builder("user.successful.logins.total")
+                .description("Total number of successful user logins")
+                .register(meterRegistry);
+
+        newRegistrationsCounter = Counter.builder("user.new.registrations.total")
+                .description("Total number of new user registrations")
+                .register(meterRegistry);
+
+        meterRegistry.gauge("user.registered.total", this, UserServiceImpl::getTotalRegisteredUsers);
+    }
+
+    private double getTotalRegisteredUsers() {
+        return this.count(); // this.count() 继承自 ServiceImpl，用于获取总用户数
+    }
 
     @Override
     public User register(String username, String password) {
@@ -59,6 +85,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         user.setCreateTime(LocalDateTime.now());
         user.setUpdateTime(LocalDateTime.now());
         save(user);
+        newRegistrationsCounter.increment(); // increment counter
 
         // 5. 同时创建对应的Player记录并保存到玩家表
         Player player = new Player();
@@ -111,6 +138,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         user.setState("在线");
         user.setUpdateTime(LocalDateTime.now());
         updateById(user);
+        successfulLoginsCounter.increment(); // increment counter
 
         // 5. 返回用户信息（不包含密码）
         user.setPassword(null);

@@ -3,7 +3,7 @@ server:
 #数据库配置
 spring:
   application:
-    name:blackjack
+    name: blackjack
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/bigevent?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&useSSL=false
@@ -16,4 +16,14 @@ mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true # 驼峰命名规则
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+management:
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: prometheus
 

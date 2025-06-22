@@ -30,7 +30,7 @@ public class GameServiceImpl implements GameService {
         //给deck中生成52张牌
         for (int i = 0; i < suits.length; i++) {
             for (int j = 0; j < ranks.length; j++) {
-                deck.add(new Card(suits[i], ranks[i]));
+                deck.add(new Card(suits[i], ranks[j]));
             }
         }
     }
@@ -40,28 +40,110 @@ public class GameServiceImpl implements GameService {
         Collections.shuffle(deck, random); //使用工具类Collections中的shuffle方法来打乱deck集合中的扑克牌顺序
     }
     
-    // 发牌（使用策略）
-    private Card dealCard(Integer playerId,int policy) {
-        switch (policy) {
-            case 0:
-            case 1:
-            case 2:
-            case 3:
-            default: {
-                return deck.remove(deck.size() - 1);   //删除集合中最后一张牌
+    // 辅助方法：从牌堆中随机获取一张牌并移除
+    private Card getRandomCard() {
+        if (deck.isEmpty()) {
+            initializeDeck();
+            shuffleDeck();
+        }
+        return deck.remove(random.nextInt(deck.size()));
+    }
+
+    // 从牌堆中找到并移除一张特定点数的牌
+    private Card findAndRemoveSpecificCard(int targetValue) {
+        for (int i = 0; i < deck.size(); i++) {
+            Card card = deck.get(i);
+            // 对于A, J, Q, K，点数是11或10
+            int cardActualValue = card.getValue(); // 假设 Card.getValue() 返回数字牌的点数，A为11，JQK为10
+            
+            if (card.getRank().equals("A")) {
+                if (targetValue == 1 || targetValue == 11) return deck.remove(i);
+            } else if (("J".equals(card.getRank()) || "Q".equals(card.getRank()) || "K".equals(card.getRank())) && targetValue == 10) {
+                return deck.remove(i);
+            } else if (cardActualValue == targetValue && cardActualValue >=2 && cardActualValue <=9) {
+                return deck.remove(i);
             }
         }
+        return getRandomCard(); // 如果没有找到，就发一张随机牌
     }
-    
-    // 根据点数找到对应的牌
-    private Card findCardByValue(int value) {
-        for (Card card : deck) {
-            if (card.getValue() == value) {
-                return card;
+
+    // p1 方法：爆牌策略
+    private Card p1(List<Card> currentHand) {
+        int currentScore = calculateScore(currentHand); // 使用已有的 calculateScore 方法
+        // 尝试发一张能使总分超过21的牌
+        for (int i = 0; i < deck.size(); i++) {
+            Card card = deck.get(i);
+            int cardValue = card.getValue(); // 获取牌的实际点数
+            if (card.getRank().equals("A")) {
+                // 尝试将A视为11点来爆牌
+                if (currentScore + 11 > 21) {
+                    return deck.remove(i);
+                }
+            }
+            if (currentScore + cardValue > 21) {
+                return deck.remove(i);
             }
         }
-        return null;
+        // 如果没有牌能直接爆牌，尝试发一张高点数的牌，增加后续爆牌可能性
+        return findAndRemoveSpecificCard(10); // 尝试发一张10点牌
     }
+
+    // p2 方法：条件性爆牌策略
+    private Card p2(List<Card> currentHand, Player player, int betAmount) {
+        if (player != null && betAmount > player.getBalance() / 2.0) {
+            return p1(currentHand); // 调用 p1 逻辑实现爆牌
+        } else {
+            return getRandomCard(); // 否则随机发牌
+        }
+    }
+
+    // p3 方法：使用21点策略
+    private Card p3(List<Card> currentHand) {
+        int currentScore = calculateScore(currentHand);
+        int needed = 21 - currentScore;
+
+        // 如果已经21点或超过，或不可能通过一张牌达到21点
+        if (needed <= 0 || needed > 11) { // 需要的点数不可能通过一张牌达到
+            return getRandomCard();
+        }
+
+        // 尝试找到精确的点数牌
+        Card exactCard = findAndRemoveSpecificCard(needed);
+        if (exactCard != null) {
+            return exactCard;
+        }
+        return getRandomCard(); // 如果没找到精确的牌，就随机发牌
+    }
+
+    // 用户的发牌方法（使用策略）
+    private Card dealCard(Game game, int policyCode, boolean isPlayerCard) {
+        if (deck.isEmpty()) {
+            initializeDeck();
+            shuffleDeck();
+        }
+
+        List<Card> targetHand = isPlayerCard ? parseCards(game.getPlayerCards()) : parseCards(game.getDealerCards());
+        Player player = playerMapper.selectById(game.getPlayerId()); // 获取最新玩家数据
+        int betAmount = game.getBetAmount(); // 获取游戏中的下注金额
+
+        switch (policyCode) {
+            case 1: // 高胜率玩家 - 使用爆牌策略
+                return p1(targetHand);
+            case 2: // 高余额玩家 - 使用条件性爆牌策略
+                return p2(targetHand, player, betAmount);
+            case 3: // 连败局玩家 - 使用21点策略
+                return p3(targetHand);
+            case 4: // 连胜玩家 - 使用爆牌策略
+                return p1(targetHand); // 连赢限制也用爆牌逻辑
+            default:
+                return getRandomCard(); // 默认策略：随机发牌
+        }
+    }
+    //庄家策略
+    private Card dealERCard() {
+        return getRandomCard(); // 默认策略：随机发牌
+    }
+
     //把集合中所有元素转换成字符串
     private String convertCardsToString(List<Card> cards) {
         //CSV 格式（简单拼接）
@@ -90,30 +172,42 @@ public class GameServiceImpl implements GameService {
         shuffleDeck();
         //获取发牌策略
         Policy policy = new Policy();
+        Player player = playerMapper.selectById(playerId);
+        policy.updatePolicy(player);
+        int activePolicyCode = policy.getPolicy(); // 获取激活的策略代码
+
         // 创建新游戏
         Game game = new Game();
         game.setGameId(generateGameId());
         game.setPlayerId(playerId);
         game.setBetAmount(betAmount);
         game.setGameStatus("进行中");
-        // 发初始牌
+
         List<Card> playerCards = new ArrayList<>();
         List<Card> dealerCards = new ArrayList<>();
 
         // 玩家两张牌
-        playerCards.add(dealCard(playerId,policy.getPolicy()));
-        playerCards.add(dealCard(playerId,policy.getPolicy()));
+        // 每次发牌前更新游戏对象的牌字符串，以便 dealCard 内部的 parseCards 获取最新手牌
+        playerCards.add(dealCard(game, activePolicyCode, true));
+        game.setPlayerCards(convertCardsToString(playerCards));
+        playerCards.add(dealCard(game, activePolicyCode, true));
+        game.setPlayerCards(convertCardsToString(playerCards));
 
         // 庄家两张牌（第一张明牌，第二张暗牌）
-        dealerCards.add(dealCard(playerId,policy.getPolicy()));
-        dealerCards.add(dealCard(playerId,policy.getPolicy()));
-
-        game.setPlayerCards(convertCardsToString(playerCards));
+        dealerCards.add(dealERCard()); // 使用 dealERCard()
+        game.setDealerCards(convertCardsToString(dealerCards));
+        dealerCards.add(dealERCard()); // 使用 dealERCard()
         game.setDealerCards(convertCardsToString(dealerCards));
 
         // 计算点数
         game.setPlayerScore(calculateScore(playerCards));
         game.setDealerScore(calculateScore(Arrays.asList(dealerCards.get(0))));
+
+        //埋点判断是否21点
+        if(game.getPlayerScore()==21){
+            player.setWin21(player.getWin21()+1);
+            playerMapper.updateById(player);
+        }
 
         // 检查是否黑杰克
         if (isBlackJack(playerCards)) {
@@ -138,7 +232,6 @@ public class GameServiceImpl implements GameService {
         games.put(game.getGameId(), game);
 
         // 数据埋点：更新玩家数据
-        Player player = playerMapper.selectById(playerId);
         if (player != null) {
             if ("玩家赢".equals(game.getGameStatus())) {
                 player.setWinNumber(player.getWinNumber() + 1); // 增加胜场
@@ -174,10 +267,14 @@ public class GameServiceImpl implements GameService {
         if (!"进行中".equals(game.getGameStatus())) {
             throw new RuntimeException("游戏已结束");
         }
-        //获取发牌策略
+        //获取玩家对象和发牌策略
+        Player player = playerMapper.selectById(game.getPlayerId()); // 在方法开头声明一次
         Policy policy = new Policy();
+        policy.updatePolicy(player);
+        int activePolicyCode = policy.getPolicy(); // 获取激活的策略代码
+        
         // 给玩家发一张牌（使用策略）
-        Card newCard = dealCard(game.getPlayerId(),policy.getPolicy());
+        Card newCard = dealCard(game, activePolicyCode, true); // 传入 game, 策略代码, 玩家牌标识
         String y = game.getPlayerCards();//获取用户的牌
         String n = newCard.toString();//发的新牌
         game.setPlayerCards((y+","+n));//原来所有的牌加上新牌放进数据库中
@@ -194,8 +291,7 @@ public class GameServiceImpl implements GameService {
             game.setDealerScore(calculateScore(cards));
 
             // 数据埋点：更新玩家数据
-            Player player = playerMapper.selectById(game.getPlayerId());
-            if (player != null) {
+            if (player != null) { 
                 player.setAllNumber(player.getAllNumber() + 1); // 增加总场次
                 player.setConsecutiveLosses(player.getConsecutiveLosses() + 1); // 增加连输次数
                 player.setConsecutiveWins(0); // 连赢次数清零
@@ -228,12 +324,21 @@ public class GameServiceImpl implements GameService {
         List<Card> cards = parseCards(game.getDealerCards());
         game.setDealerScore(calculateScore(cards));
 
+        // 获取玩家对象和发牌策略
+        Player player = playerMapper.selectById(game.getPlayerId()); // 在方法开头声明一次
+        Policy policy = new Policy();
+        policy.updatePolicy(player);
+
+        // 数据埋点：更新玩家数据（21点数据记录）
+        if(game.getPlayerScore()==21){
+            player.setWin21(player.getWin21()+1);
+            playerMapper.updateById(player);
+        }
+
         // 庄家要牌策略：点数小于17时必须要牌
         while (game.getDealerScore() < 17) {
-            //获取发牌策略
-            Policy policy = new Policy();
             //获取新牌
-            Card newCard = dealCard(game.getPlayerId(),policy.getPolicy());
+            Card newCard = dealERCard(); // 使用 dealERCard()
             String y = game.getDealerCards();//获取庄家之前的牌
             String n = newCard.toString();//新发的牌
             game.setDealerCards((y+","+n));//所有的牌放进数据库
@@ -244,19 +349,12 @@ public class GameServiceImpl implements GameService {
             if (isBust(game.getDealerScore())) {
                 game.setGameStatus("玩家赢");
                 game.setResult("庄家爆牌！玩家获胜！");
-                Player player = playerMapper.selectById(game.getPlayerId());
-                player.setWinNumber(player.getWinNumber()+1);
+                player.setWinNumber(player.getWinNumber()+1); 
                 playerMapper.updateById(player);
                 win(game.getPlayerId(), game.getPlayerScore());
                 game.setBetAmount(game.getBetAmount()*2);//筹码翻倍
                 return game;
             }
-        }
-        // 数据埋点：更新玩家数据（21点数据记录）
-        if(game.getPlayerScore()==21){
-            Player player = playerMapper.selectById(game.getPlayerId());
-            player.setWin21(player.getWin21()+1);
-            playerMapper.updateById(player);
         }
 
         // 比较点数决定胜负
@@ -277,8 +375,7 @@ public class GameServiceImpl implements GameService {
             game.setGameStatus("平局");
             game.setResult("点数相同！平局！");
             // 数据埋点：更新玩家数据（平局）
-            Player player = playerMapper.selectById(game.getPlayerId());
-            if (player != null) {
+            if (player != null) { 
                 player.setAllNumber(player.getAllNumber() + 1); // 增加总场次
                 // 重新计算胜率
                 if (player.getAllNumber() > 0) {
@@ -291,8 +388,7 @@ public class GameServiceImpl implements GameService {
             return game;
         }
         // 数据埋点：更新玩家数据（赢或输）
-        Player player = playerMapper.selectById(game.getPlayerId());
-        if (player != null) {
+        if (player != null) { 
             player.setAllNumber(player.getAllNumber() + 1); // 增加总场次
             if (playerWon) {
                 player.setWinNumber(player.getWinNumber() + 1); // 增加胜场
